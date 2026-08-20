@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep Ladybird's Rust toolchain and Cargo files inside the repository.
+LOCAL_RUST=false
+
+patch_vcpkg_for_debian() {
+    local file="vcpkg.json"
+
+    jq -e '.dependencies[] | select(type == "object" and .name == "qtbase") | .platform | contains("linux")' "$file" >/dev/null && return
+
+    echo "Patching vcpkg.json for Debian..."
+
+    local tmp
+    tmp="$(mktemp)"
+
+    if jq '
+        (.overrides[] | select(.name == "qtpositioning") | .version) as $qt_version |
+        .dependencies |= map(
+            if type == "object" and .name == "qtbase" then
+                .platform = "linux | freebsd" |
+                .features += ["egl"]
+            elif type == "object" and .name == "qtpositioning" then
+                .platform = "linux | windows | freebsd"
+            else
+                .
+            end
+        ) |
+        .dependencies += [{
+            "name": "qtwayland",
+            "platform": "linux",
+            "default-features": false
+        }] |
+        .overrides += [{
+            "name": "qtwayland",
+            "version": $qt_version
+        }]
+    ' "$file" > "$tmp"; then
+        mv "$tmp" "$file"
+    else
+        rm -f "$tmp"
+        return 1
+    fi
+}
+
+if [[ -r /etc/os-release ]]; then
+    source /etc/os-release
+
+    if [[ "$ID" == "debian" ]]; then
+        if ! command -v jq >/dev/null 2>&1; then
+            echo "jq is required. Do: sudo apt-get install jq"
+            exit 1
+        fi
+
+        if ! dpkg-query -W -f='${Status}' libwayland-dev 2>/dev/null | grep -q "ok installed"; then
+            echo "QtWayland requires libwayland-dev. Do: sudo apt-get install libwayland-dev"
+            exit 1
+        fi
+
+        patch_vcpkg_for_debian
+    fi
+fi
+
+if [[ "$LOCAL_RUST" == true ]]; then
+    mkdir -p .rustup-home .cargo-home
+
+    if ! RUSTUP_HOME="$PWD/.rustup-home" \
+    CARGO_HOME="$PWD/.cargo-home" \
+    PATH="$PWD/.cargo-home/bin:$PATH" \
+    ./Meta/ladybird.py run; then
+        BUILD_FAILED=true
+    fi
+else
+    if ! ./Meta/ladybird.py run; then
+        BUILD_FAILED=true
+    fi
+fi
+
+if [[ "${BUILD_FAILED:-false}" == true ]]; then
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -i dialog-error "Ladybird" "Compilation unsuccessful"
+    fi
+    exit 1
+fi
