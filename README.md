@@ -60,19 +60,14 @@ The first run may take significantly longer because vcpkg has to build Qt locall
 
 ## Local Rust
 
-By default, the script uses your normal Rust environment.
+Ladybird requires Rust as part of its build process.
 
-If you want to keep Rust toolchain and Cargo files inside the repository instead, set:
+If you prefer to use a separate Rust environment for building Ladybird, or simply do not want Rust installed in your regular user environment, set:
 
 ```bash
 LOCAL_RUST=true
 ```
 
-This will use:
+This keeps Rust and Cargo files local to the Ladybird repository, using `.rustup-home/` and `.cargo-home/` instead of your normal `~/.rustup` and `~/.cargo`.
 
-```text
-.rustup-home/
-.cargo-home/
-```
-
-inside the Ladybird repository instead of your normal `~/.rustup` and `~/.cargo`.
+Leave `LOCAL_RUST=false` to use your regular Rust environment.
