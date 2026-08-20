@@ -62,7 +62,11 @@ if [[ -r /etc/os-release ]]; then
 fi
 
 if [[ "$LOCAL_RUST" == true ]]; then
-    mkdir -p .rustup-home .cargo-home
+    if [[ ! -x "$PWD/.cargo-home/bin/cargo" ]]; then
+        echo "LOCAL_RUST is enabled, but no local Rust installation was found."
+        echo "See the Local Rust section in README.md for installation instructions."
+        exit 1
+    fi
 
     if ! RUSTUP_HOME="$PWD/.rustup-home" \
     CARGO_HOME="$PWD/.cargo-home" \
