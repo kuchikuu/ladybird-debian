@@ -47,15 +47,60 @@ if [[ -r /etc/os-release ]]; then
     source /etc/os-release
 
     if [[ "$ID" == "debian" ]]; then
-        if ! command -v jq >/dev/null 2>&1; then
-            echo "jq is required. Do: sudo apt-get install jq"
-            exit 1
-        fi
 
-        if ! dpkg-query -W -f='${Status}' libwayland-dev 2>/dev/null | grep -q "ok installed"; then
-            echo "QtWayland requires libwayland-dev. Do: sudo apt-get install libwayland-dev"
-            exit 1
-        fi
+	declare -A REQUIRED_PACKAGES=(
+	    [autoconf]="Ladybird requires autoconf."
+	    [autoconf-archive]="Ladybird requires autoconf-archive."
+	    [automake]="Ladybird requires automake."
+	    [build-essential]="Ladybird requires build-essential."
+	    [ccache]="Ladybird requires ccache."
+	    [cmake]="Ladybird requires CMake."
+	    [curl]="Ladybird requires curl."
+	    [fonts-liberation2]="Ladybird requires fonts-liberation2."
+	    [git]="Ladybird requires git."
+	    [glslang-tools]="Ladybird requires glslang-tools."
+	    [libdrm-dev]="Ladybird requires libdrm-dev."
+	    [libgl1-mesa-dev]="Ladybird requires libgl1-mesa-dev."
+	    [libncurses-dev]="Ladybird requires libncurses-dev."
+	    [libpulse-dev]="Ladybird requires libpulse-dev."
+	    [libtool]="Ladybird requires libtool."
+	    [nasm]="Ladybird requires nasm."
+	    [ninja-build]="Ladybird requires ninja-build."
+	    [pkg-config]="Ladybird requires pkg-config."
+	    [python3-venv]="Ladybird requires python3-venv."
+	    [tar]="Ladybird requires tar."
+	    [unzip]="Ladybird requires unzip."
+	    [zip]="Ladybird requires zip."
+
+	    [jq]="This build script requires jq."
+	    [libwayland-dev]="QtWayland requires libwayland-dev."
+	    [mesa-common-dev]="ANGLE requires mesa-common-dev."
+	)
+
+	declare -A INSTALLED_PACKAGES
+
+	while IFS=$'\t' read -r package status; do
+	    [[ "$status" == "install ok installed" ]] && INSTALLED_PACKAGES["$package"]=1
+	done < <(
+	    dpkg-query -W -f='${Package}\t${Status}\n' \
+		"${!REQUIRED_PACKAGES[@]}" 2>/dev/null
+	)
+
+	MISSING_PACKAGES=()
+
+	for package in "${!REQUIRED_PACKAGES[@]}"; do
+	    if [[ ! ${INSTALLED_PACKAGES[$package]+x} ]]; then
+		echo "${REQUIRED_PACKAGES[$package]}"
+		MISSING_PACKAGES+=("$package")
+	    fi
+	done
+
+	if (( ${#MISSING_PACKAGES[@]} )); then
+	    echo
+	    echo "Install missing packages with:"
+	    echo "sudo apt-get install ${MISSING_PACKAGES[*]}"
+	    exit 1
+	fi
 
         patch_vcpkg_for_debian
     fi
