@@ -29,15 +29,9 @@ If the required vcpkg modifications are already present, the script leaves `vcpk
 
 ## Requirements
 
-Install Ladybird's normal Debian build dependencies first.
+The script automatically checks for the required Debian packages before starting the build.
 
-The script additionally requires:
-
-```bash
-sudo apt install jq libwayland-dev
-```
-
-It does not install packages automatically. If either dependency is missing, it prints the required command and exits.
+If any packages are missing, it will list them and print a ready-to-use `apt` command to install all missing dependencies. The script does not install any packages automatically.
 
 ## Usage
 
