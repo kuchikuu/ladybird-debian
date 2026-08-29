@@ -43,117 +43,144 @@ patch_vcpkg_for_debian() {
     fi
 }
 
+show_derivative_warning() {
+    if [[ "$(git config --local --get ladybird-debian.derivativeWarningAcknowledged 2>/dev/null || true)" == "true" ]]; then
+        return
+    fi
+
+    echo
+    echo "Warning: This script is designed for vanilla Debian."
+    echo "You appear to be using a Debian-based derivative. Compatibility with your system may vary."
+    echo
+    echo "This warning will appear only once."
+
+    read -r -p "Press Enter to continue..."
+
+    git config --local ladybird-debian.derivativeWarningAcknowledged true
+
+    echo
+}
+
+if ! command -v apt >/dev/null 2>&1; then
+    echo "This script requires an APT-based Linux distribution."
+    echo "Your system does not appear to use APT, so this script cannot continue."
+    exit 1
+fi
+
 if [[ -r /etc/os-release ]]; then
     source /etc/os-release
 
-    if [[ "$ID" == "debian" ]]; then
-
-	declare -A REQUIRED_PACKAGES=(
-	    # Ladybird dependencies
-	    [autoconf]="Ladybird requires autoconf."
-	    [autoconf-archive]="Ladybird requires autoconf-archive."
-	    [automake]="Ladybird requires automake."
-	    [build-essential]="Ladybird requires build-essential."
-	    [ccache]="Ladybird requires ccache."
-	    [cmake]="Ladybird requires CMake."
-	    [curl]="Ladybird requires curl."
-	    [fonts-liberation2]="Ladybird requires fonts-liberation2."
-	    [git]="Ladybird requires git."
-	    [glslang-tools]="Ladybird requires glslang-tools."
-	    [libdrm-dev]="Ladybird requires libdrm-dev."
-	    [libgl1-mesa-dev]="Ladybird requires libgl1-mesa-dev."
-	    [libncurses-dev]="Ladybird requires libncurses-dev."
-	    [libpulse-dev]="Ladybird requires libpulse-dev."
-	    [libtool]="Ladybird requires libtool."
-	    [nasm]="Ladybird requires nasm."
-	    [ninja-build]="Ladybird requires ninja-build."
-	    [pkg-config]="Ladybird requires pkg-config."
-	    [python3-venv]="Ladybird requires python3-venv."
-	    [tar]="Ladybird requires tar."
-	    [unzip]="Ladybird requires unzip."
-	    [zip]="Ladybird requires zip."
-	
-	    # Qt dependencies
-	    [libxcb-composite0-dev]="QtBase requires libxcb-composite0-dev."
-	    [libxcb-cursor-dev]="QtBase requires libxcb-cursor-dev."
-	    [libxcb-damage0-dev]="QtBase requires libxcb-damage0-dev."
-	    [libxcb-dpms0-dev]="QtBase requires libxcb-dpms0-dev."
-	    [libxcb-dri2-0-dev]="QtBase requires libxcb-dri2-0-dev."
-	    [libxcb-dri3-dev]="QtBase requires libxcb-dri3-dev."
-	    [libxcb-errors-dev]="QtBase requires libxcb-errors-dev."
-	    [libxcb-ewmh-dev]="QtBase requires libxcb-ewmh-dev."
-	    [libxcb-glx0-dev]="QtBase requires libxcb-glx0-dev."
-	    [libxcb-icccm4-dev]="QtBase requires libxcb-icccm4-dev."
-	    [libxcb-image0-dev]="QtBase requires libxcb-image0-dev."
-	    [libxcb-imdkit-dev]="QtBase requires libxcb-imdkit-dev."
-	    [libxcb-keysyms1-dev]="QtBase requires libxcb-keysyms1-dev."
-	    [libxcb-present-dev]="QtBase requires libxcb-present-dev."
-	    [libxcb-randr0-dev]="QtBase requires libxcb-randr0-dev."
-	    [libxcb-record0-dev]="QtBase requires libxcb-record0-dev."
-	    [libxcb-render-util0-dev]="QtBase requires libxcb-render-util0-dev."
-	    [libxcb-render0-dev]="QtBase requires libxcb-render0-dev."
-	    [libxcb-res0-dev]="QtBase requires libxcb-res0-dev."
-	    [libxcb-screensaver0-dev]="QtBase requires libxcb-screensaver0-dev."
-	    [libxcb-shape0-dev]="QtBase requires libxcb-shape0-dev."
-	    [libxcb-shm0-dev]="QtBase requires libxcb-shm0-dev."
-	    [libxcb-sync-dev]="QtBase requires libxcb-sync-dev."
-	    [libxcb-util-dev]="QtBase requires libxcb-util-dev."
-	    [libxcb-util0-dev]="QtBase requires libxcb-util0-dev."
-	    [libxcb-xf86dri0-dev]="QtBase requires libxcb-xf86dri0-dev."
-	    [libxcb-xfixes0-dev]="QtBase requires libxcb-xfixes0-dev."
-	    [libxcb-xinerama0-dev]="QtBase requires libxcb-xinerama0-dev."
-	    [libxcb-xinput-dev]="QtBase requires libxcb-xinput-dev."
-	    [libxcb-xkb-dev]="QtBase requires libxcb-xkb-dev."
-	    [libxcb-xrm-dev]="QtBase requires libxcb-xrm-dev."
-	    [libxcb-xtest0-dev]="QtBase requires libxcb-xtest0-dev."
-	    [libxcb-xv0-dev]="QtBase requires libxcb-xv0-dev."
-	    [libxcb-xvmc0-dev]="QtBase requires libxcb-xvmc0-dev."
-	    [libxcb1-dev]="QtBase requires libxcb1-dev."
-	
-	    [libx11-xcb-dev]="QtBase requires libx11-xcb-dev."
-	    [libglu1-mesa-dev]="QtBase requires libglu1-mesa-dev."
-	    [libxrender-dev]="QtBase requires libxrender-dev."
-	    [libxi-dev]="QtBase requires libxi-dev."
-	    [libxkbcommon-dev]="QtBase requires libxkbcommon-dev."
-	    [libxkbcommon-x11-dev]="QtBase requires libxkbcommon-x11-dev."
-	    [libegl1-mesa-dev]="QtBase requires libegl1-mesa-dev."
-	    [libwayland-dev]="QtWayland requires libwayland-dev."
-
-		# Other dependencies
-	    [mesa-common-dev]="ANGLE requires mesa-common-dev."
-	
-	    # This script dependencies
-	    [jq]="This build script requires jq."
-	)
-
-	declare -A INSTALLED_PACKAGES
-
-	while IFS=$'\t' read -r package status; do
-	    [[ "$status" == "install ok installed" ]] && INSTALLED_PACKAGES["$package"]=1
-	done < <(
-	    dpkg-query -W -f='${Package}\t${Status}\n' \
-		"${!REQUIRED_PACKAGES[@]}" 2>/dev/null
-	)
-
-	MISSING_PACKAGES=()
-
-	for package in "${!REQUIRED_PACKAGES[@]}"; do
-	    if [[ ! ${INSTALLED_PACKAGES[$package]+x} ]]; then
-		echo "${REQUIRED_PACKAGES[$package]}"
-		MISSING_PACKAGES+=("$package")
-	    fi
-	done
-
-	if (( ${#MISSING_PACKAGES[@]} )); then
-	    echo
-	    echo "Install missing packages with:"
-	    echo "sudo apt-get install ${MISSING_PACKAGES[*]}"
-	    exit 1
-	fi
-
-        patch_vcpkg_for_debian
-    fi
+    if [[ "${ID:-}" != "debian" ]]; then
+		show_derivative_warning
+else
+	show_derivative_warning
 fi
+
+declare -A REQUIRED_PACKAGES=(
+	# Ladybird dependencies
+	[autoconf]="Ladybird requires autoconf."
+	[autoconf-archive]="Ladybird requires autoconf-archive."
+	[automake]="Ladybird requires automake."
+	[build-essential]="Ladybird requires build-essential."
+	[ccache]="Ladybird requires ccache."
+	[cmake]="Ladybird requires CMake."
+	[curl]="Ladybird requires curl."
+	[fonts-liberation2]="Ladybird requires fonts-liberation2."
+	[git]="Ladybird requires git."
+	[glslang-tools]="Ladybird requires glslang-tools."
+	[libdrm-dev]="Ladybird requires libdrm-dev."
+	[libgl1-mesa-dev]="Ladybird requires libgl1-mesa-dev."
+	[libncurses-dev]="Ladybird requires libncurses-dev."
+	[libpulse-dev]="Ladybird requires libpulse-dev."
+	[libtool]="Ladybird requires libtool."
+	[nasm]="Ladybird requires nasm."
+	[ninja-build]="Ladybird requires ninja-build."
+	[pkg-config]="Ladybird requires pkg-config."
+	[python3-venv]="Ladybird requires python3-venv."
+	[tar]="Ladybird requires tar."
+	[unzip]="Ladybird requires unzip."
+	[zip]="Ladybird requires zip."
+
+	# Qt dependencies
+	[libxcb-composite0-dev]="QtBase requires libxcb-composite0-dev."
+	[libxcb-cursor-dev]="QtBase requires libxcb-cursor-dev."
+	[libxcb-damage0-dev]="QtBase requires libxcb-damage0-dev."
+	[libxcb-dpms0-dev]="QtBase requires libxcb-dpms0-dev."
+	[libxcb-dri2-0-dev]="QtBase requires libxcb-dri2-0-dev."
+	[libxcb-dri3-dev]="QtBase requires libxcb-dri3-dev."
+	[libxcb-errors-dev]="QtBase requires libxcb-errors-dev."
+	[libxcb-ewmh-dev]="QtBase requires libxcb-ewmh-dev."
+	[libxcb-glx0-dev]="QtBase requires libxcb-glx0-dev."
+	[libxcb-icccm4-dev]="QtBase requires libxcb-icccm4-dev."
+	[libxcb-image0-dev]="QtBase requires libxcb-image0-dev."
+	[libxcb-imdkit-dev]="QtBase requires libxcb-imdkit-dev."
+	[libxcb-keysyms1-dev]="QtBase requires libxcb-keysyms1-dev."
+	[libxcb-present-dev]="QtBase requires libxcb-present-dev."
+	[libxcb-randr0-dev]="QtBase requires libxcb-randr0-dev."
+	[libxcb-record0-dev]="QtBase requires libxcb-record0-dev."
+	[libxcb-render-util0-dev]="QtBase requires libxcb-render-util0-dev."
+	[libxcb-render0-dev]="QtBase requires libxcb-render0-dev."
+	[libxcb-res0-dev]="QtBase requires libxcb-res0-dev."
+	[libxcb-screensaver0-dev]="QtBase requires libxcb-screensaver0-dev."
+	[libxcb-shape0-dev]="QtBase requires libxcb-shape0-dev."
+	[libxcb-shm0-dev]="QtBase requires libxcb-shm0-dev."
+	[libxcb-sync-dev]="QtBase requires libxcb-sync-dev."
+	[libxcb-util-dev]="QtBase requires libxcb-util-dev."
+	[libxcb-util0-dev]="QtBase requires libxcb-util0-dev."
+	[libxcb-xf86dri0-dev]="QtBase requires libxcb-xf86dri0-dev."
+	[libxcb-xfixes0-dev]="QtBase requires libxcb-xfixes0-dev."
+	[libxcb-xinerama0-dev]="QtBase requires libxcb-xinerama0-dev."
+	[libxcb-xinput-dev]="QtBase requires libxcb-xinput-dev."
+	[libxcb-xkb-dev]="QtBase requires libxcb-xkb-dev."
+	[libxcb-xrm-dev]="QtBase requires libxcb-xrm-dev."
+	[libxcb-xtest0-dev]="QtBase requires libxcb-xtest0-dev."
+	[libxcb-xv0-dev]="QtBase requires libxcb-xv0-dev."
+	[libxcb-xvmc0-dev]="QtBase requires libxcb-xvmc0-dev."
+	[libxcb1-dev]="QtBase requires libxcb1-dev."
+
+	[libx11-xcb-dev]="QtBase requires libx11-xcb-dev."
+	[libglu1-mesa-dev]="QtBase requires libglu1-mesa-dev."
+	[libxrender-dev]="QtBase requires libxrender-dev."
+	[libxi-dev]="QtBase requires libxi-dev."
+	[libxkbcommon-dev]="QtBase requires libxkbcommon-dev."
+	[libxkbcommon-x11-dev]="QtBase requires libxkbcommon-x11-dev."
+	[libegl1-mesa-dev]="QtBase requires libegl1-mesa-dev."
+	[libwayland-dev]="QtWayland requires libwayland-dev."
+
+	# Other dependencies
+	[mesa-common-dev]="ANGLE requires mesa-common-dev."
+
+	# This script dependencies
+	[jq]="This build script requires jq."
+)
+
+declare -A INSTALLED_PACKAGES
+
+while IFS=$'\t' read -r package status; do
+	[[ "$status" == "install ok installed" ]] && INSTALLED_PACKAGES["$package"]=1
+done < <(
+	dpkg-query -W -f='${Package}\t${Status}\n' \
+	"${!REQUIRED_PACKAGES[@]}" 2>/dev/null
+)
+
+MISSING_PACKAGES=()
+
+for package in "${!REQUIRED_PACKAGES[@]}"; do
+	if [[ ! ${INSTALLED_PACKAGES[$package]+x} ]]; then
+	echo "${REQUIRED_PACKAGES[$package]}"
+	MISSING_PACKAGES+=("$package")
+	fi
+done
+
+if (( ${#MISSING_PACKAGES[@]} )); then
+	echo
+	echo "Install missing packages with:"
+	echo "sudo apt-get install ${MISSING_PACKAGES[*]}"
+	exit 1
+fi
+
+patch_vcpkg_for_debian
+
 
 if [[ "$LOCAL_RUST" == true ]]; then
     if [[ ! -x "$PWD/.cargo-home/bin/cargo" ]]; then
