@@ -77,6 +77,28 @@ else
 	show_derivative_warning
 fi
 
+# TODO: Check whether other malloc alternatives work with Ladybird:
+# jemalloc, tcmalloc, mimalloc.
+
+if { [[ -r /etc/ld.so.preload ]] &&
+     grep -qi "hardened_malloc" /etc/ld.so.preload; } ||
+   [[ "${LD_PRELOAD:-}" == *hardened_malloc* ]]; then
+
+    if [[ "$(git config --local --get ladybird-debian.hardenedMallocWarningShown 2>/dev/null || true)" != "true" ]]; then
+        echo
+        echo "Warning: GrapheneOS hardened_malloc was detected."
+        echo "As of August 27, 2026, Ladybird is known to fail to start when hardened_malloc is preloaded."
+        echo
+        echo "This warning will appear only once."
+
+        read -r -p "Press Enter to continue..."
+
+        git config --local ladybird-debian.hardenedMallocWarningShown true
+
+        echo
+    fi
+fi
+
 declare -A REQUIRED_PACKAGES=(
 	# Ladybird dependencies
 	[autoconf]="Ladybird requires autoconf."
