@@ -72,6 +72,7 @@ if [[ -r /etc/os-release ]]; then
 
     if [[ "${ID:-}" != "debian" ]]; then
 		show_derivative_warning
+	fi
 else
 	show_derivative_warning
 fi
