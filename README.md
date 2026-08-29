@@ -10,11 +10,12 @@ Because Debian gets no love, apparently.
 
 ## What it does
 
-On Debian, the script:
+The script:
 
-- Detects Debian using `/etc/os-release`.
-- Checks that `jq` is available before modifying `vcpkg.json`.
-- Checks that `libwayland-dev` is installed, as it is required to build Qt with Wayland support through vcpkg.
+- Checks that the system uses APT.
+- Detects vanilla Debian using `/etc/os-release` and displays a one-time warning on Debian-based derivatives.
+- Checks for the required Debian packages and provides a ready-to-use installation command if any are missing.
+- Detects GrapheneOS hardened_malloc and displays a one-time compatibility warning if it is preloaded.
 - Enables `qtbase` from vcpkg on Linux.
 - Enables EGL support in `qtbase`.
 - Enables `qtpositioning` from vcpkg on Linux.
