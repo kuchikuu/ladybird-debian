@@ -53,6 +53,39 @@ Then simply run:
 
 The first run may take significantly longer because vcpkg has to build Qt locally. Subsequent builds remain incremental.
 
+## CPU target
+
+By default, the script keeps Ladybird's normal native CPU optimization:
+
+```bash
+PORTABLE_BUILD=false
+```
+
+This uses:
+
+```text
+-march=native
+```
+
+and is intended for local builds on the same machine.
+
+If you want a more portable x86_64 build, for example before creating an AppImage for use on other computers, set:
+
+```bash
+PORTABLE_BUILD=true
+```
+
+The script will then configure Ladybird with:
+
+```text
+-march=x86-64
+-mtune=generic
+```
+
+The setting is stored directly in the `build` script, so subsequent builds continue using the selected CPU target until you change it again.
+
+Changing between native and portable mode changes the compiler command line, so Ladybird/Lagom will need to be recompiled. vcpkg dependencies are handled separately and normally remain incremental.
+
 ## Local Rust
 
 Ladybird requires a Rust toolchain to build.
@@ -89,31 +122,56 @@ Leave `LOCAL_RUST=false` to use your regular Rust environment instead.
 
 ## Experimental AppImage
 
-The repository also contains a script for creating a portable Ladybird AppImage from an existing local build.
+The repository also contains a script for creating a Ladybird AppImage from an existing local build.
 
 This is separate from the normal build process. Build Ladybird first, then run the AppImage packaging script.
 
-Copy `make-ladybird-appimage.sh` into the root directory of the Ladybird repository and make it executable:
+For an AppImage intended to run on other x86_64 machines, use a portable Ladybird build first:
+
+```bash
+PORTABLE_BUILD=true
+./build
+```
+
+Then copy `make-ladybird-appimage.sh` into the root directory of the Ladybird repository and make it executable:
 
 ```bash
 chmod +x make-ladybird-appimage.sh
 ```
 
-Then run:
+Run:
 
 ```bash
 ./make-ladybird-appimage.sh
 ```
 
-The resulting AppImage is written to:
+The packaging script automatically detects the CPU build type from `Build/release/compile_commands.json` and includes it in the filename:
+
+- `generic` for `-march=x86-64 -mtune=generic`
+- `native` for `-march=native`
+- `unknown` if the build type cannot be detected
+
+It also adds the architecture, packaging date and time, and the first eight characters of the current Ladybird Git commit.
+
+For example:
 
 ```text
-dist/Ladybird-x86_64.AppImage
+dist/Ladybird-x86_64-generic-20260915-2321-154e8d68.AppImage
 ```
+
+The filename format is:
+
+```text
+Ladybird-{architecture}-{generic/native/unknown}-{YYYYMMDD-HHMM}-{git-hash}.AppImage
+```
+
+If Git metadata is unavailable, the hash field is written as `nogit`. Failure to detect the CPU build type or Git metadata does not stop AppImage creation.
+
+A `native` AppImage may contain CPU instructions specific to the machine on which Ladybird was compiled and can therefore fail on older CPUs. Use `PORTABLE_BUILD=true` when creating an AppImage intended for wider distribution.
 
 The AppImage packaging script bundles Ladybird's userspace dependencies, Qt plugins, helper processes, and the matching Cranelift compiler. It also applies several portability fixes intended to avoid dependencies on paths, libraries, runtime directories, and GPU driver files from the machine that created the package.
 
-The AppImage is still experimental. It has not been tested on every Linux distribution, desktop environment, graphics stack, or hardware configuration.
+The AppImage is still experimental. It has not been tested on every Linux distribution, desktop environment, graphics stack, CPU generation, or hardware configuration.
 
 A prebuilt example AppImage is available from the repository's [Releases](../../releases) page.
 
