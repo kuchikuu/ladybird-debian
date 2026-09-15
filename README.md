@@ -85,3 +85,58 @@ Once installed, simply use:
 The script will automatically use the local Rust installation whenever `LOCAL_RUST=true`.
 
 Leave `LOCAL_RUST=false` to use your regular Rust environment instead.
+
+
+## Experimental AppImage
+
+The repository also contains a script for creating a portable Ladybird AppImage from an existing local build.
+
+This is separate from the normal build process. Build Ladybird first, then run the AppImage packaging script.
+
+Copy `make-ladybird-appimage.sh` into the root directory of the Ladybird repository and make it executable:
+
+```bash
+chmod +x make-ladybird-appimage.sh
+```
+
+Then run:
+
+```bash
+./make-ladybird-appimage.sh
+```
+
+The resulting AppImage is written to:
+
+```text
+dist/Ladybird-x86_64.AppImage
+```
+
+The AppImage packaging script bundles Ladybird's userspace dependencies, Qt plugins, helper processes, and the matching Cranelift compiler. It also applies several portability fixes intended to avoid dependencies on paths, libraries, runtime directories, and GPU driver files from the machine that created the package.
+
+The AppImage is still experimental. It has not been tested on every Linux distribution, desktop environment, graphics stack, or hardware configuration.
+
+A prebuilt example AppImage is available from the repository's [Releases](../../releases) page.
+
+### AppImage compatibility testing
+
+If the AppImage works on your system, feel free to open an issue or contact me with the generated compatibility row below. I would like to keep a simple list of systems on which the AppImage has been confirmed to work.
+
+Run this one-liner after confirming that Ladybird starts and renders pages correctly:
+
+```bash
+. /etc/os-release 2>/dev/null; GPU="$(command -v lspci >/dev/null 2>&1 && lspci 2>/dev/null | grep -Ei 'VGA|3D|Display' | head -n1 | sed -E 's/^[^ ]+ //' | sed 's/|/\//g' || printf unknown)"; printf '| %s | %s | %s | %s | %s | %s | ✅ |\n' "$(date '+%Y-%m-%d')" "${PRETTY_NAME:-unknown}" "$(uname -r)" "${XDG_CURRENT_DESKTOP:-unknown}" "${XDG_SESSION_TYPE:-unknown}" "${GPU:-unknown}"
+```
+
+It prints a ready-to-paste Markdown table row, for example:
+
+```text
+| 2026-09-15 | Debian GNU/Linux 13 (trixie) | 6.12.107+deb13-amd64 | XFCE | x11 | Intel Corporation ... | ✅ |
+```
+
+### Confirmed AppImage compatibility
+
+| Date | Distribution | Kernel | Desktop | Session | GPU | Result |
+|---|---|---|---|---|---|---|
+| YYYY-MM-DD | Distribution | Kernel version | Desktop | x11/wayland | GPU | ✅ |
+| 2026-09-15 | Debian GNU/Linux 13 (trixie) | 6.12.107+deb13-amd64 | XFCE | x11 | VGA compatible controller: NVIDIA Corporation TU117M [GeForce GTX 1650 Ti Mobile] (rev a1) | ✅ |
+| 2026-09-15 | Pop!_OS 22.04 LTS | 7.1.1-76070101-generic | KDE | x11 | VGA compatible controller: Intel Corporation TigerLake-H GT1 [UHD Graphics] (rev 01) | ✅ |
