@@ -4,6 +4,53 @@ set -euo pipefail
 # Keep Ladybird's Rust toolchain and Cargo files inside the repository.
 LOCAL_RUST=false
 
+# Build for the local CPU by default.
+# Set this to true for a portable x86-64 build suitable for distribution/AppImages.
+# Keep the value in this file so subsequent builds use the same CPU target.
+PORTABLE_BUILD=false
+
+configure_cpu_target() {
+    local file="Meta/CMake/compile_options.cmake"
+
+    if [[ ! -f "$file" ]]; then
+        echo "Could not find $file"
+        exit 1
+    fi
+
+    local native_line='    add_cxx_compile_options(-march=native)'
+    local generic_line='    add_cxx_compile_options(-march=x86-64 -mtune=generic)'
+    local wanted_line
+
+    if [[ "$PORTABLE_BUILD" == true ]]; then
+        wanted_line="$generic_line"
+    elif [[ "$PORTABLE_BUILD" == false ]]; then
+        wanted_line="$native_line"
+    else
+        echo "PORTABLE_BUILD must be either true or false."
+        exit 1
+    fi
+
+    if grep -Fqx "$wanted_line" "$file"; then
+        return
+    fi
+
+    if grep -Fqx "$native_line" "$file"; then
+        sed -i "s|^${native_line}$|${wanted_line}|" "$file"
+    elif grep -Fqx "$generic_line" "$file"; then
+        sed -i "s|^${generic_line}$|${wanted_line}|" "$file"
+    else
+        echo "Could not find the expected Ladybird CPU compile option in $file."
+        echo "Upstream may have changed Meta/CMake/compile_options.cmake."
+        exit 1
+    fi
+
+    if [[ "$PORTABLE_BUILD" == true ]]; then
+        echo "Using portable CPU target: -march=x86-64 -mtune=generic"
+    else
+        echo "Using native CPU target: -march=native"
+    fi
+}
+
 patch_vcpkg_for_debian() {
     local file="vcpkg.json"
 
@@ -203,6 +250,7 @@ if (( ${#MISSING_PACKAGES[@]} )); then
 fi
 
 patch_vcpkg_for_debian
+configure_cpu_target
 
 
 if [[ "$LOCAL_RUST" == true ]]; then
