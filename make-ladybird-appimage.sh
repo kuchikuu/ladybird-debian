@@ -23,7 +23,30 @@ WORK="${WORK:-$ROOT/AppImageBuild}"
 APPDIR="${APPDIR:-$WORK/AppDir}"
 DIST="${DIST:-$ROOT/dist}"
 ARCH="${ARCH:-$(uname -m)}"
-OUTNAME="${OUTNAME:-Ladybird-${ARCH}.AppImage}"
+
+# Detect whether the existing Ladybird build was compiled for the local CPU
+# or for a generic x86-64 target. If detection fails, keep packaging and mark
+# the resulting AppImage as "unknown" instead of aborting.
+CPU_BUILD_TYPE="unknown"
+if [[ -f "$BUILD/compile_commands.json" ]]; then
+    if grep -q -- '-march=native' "$BUILD/compile_commands.json"; then
+        CPU_BUILD_TYPE="native"
+    elif grep -q -- '-march=x86-64' "$BUILD/compile_commands.json" \
+        && grep -q -- '-mtune=generic' "$BUILD/compile_commands.json"; then
+        CPU_BUILD_TYPE="generic"
+    fi
+fi
+
+# Add a compact packaging timestamp and the current Ladybird Git revision to the
+# filename. Git metadata is informational only; packaging still works outside a
+# Git checkout or when git is unavailable.
+BUILD_TIMESTAMP="${BUILD_TIMESTAMP:-$(date '+%Y%m%d-%H%M')}"
+GIT_HASH="nogit"
+if command -v git >/dev/null 2>&1; then
+    GIT_HASH="$(git -C "$ROOT" rev-parse --short=8 HEAD 2>/dev/null || printf 'nogit')"
+fi
+
+OUTNAME="${OUTNAME:-Ladybird-${ARCH}-${CPU_BUILD_TYPE}-${BUILD_TIMESTAMP}-${GIT_HASH}.AppImage}"
 CRANELIFT="${CRANELIFT:-$BUILD/bin/cranelift-compiler}"
 QUICK_SHARUN_URL="${QUICK_SHARUN_URL:-https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/quick-sharun.sh}"
 QUICK_SHARUN="$WORK/quick-sharun"
@@ -68,6 +91,11 @@ fi
 [[ -d "$VCPKG/Qt6/plugins" ]] || fail "Could not find $VCPKG/Qt6/plugins"
 [[ -f "$ROOT/Meta/CMake/freedesktop/org.ladybird.Ladybird.desktop" ]] || fail "Missing .desktop file in the repository"
 [[ -f "$ROOT/Base/res/icons/128x128/app-browser.png" ]] || fail "Missing Ladybird icon"
+
+note "Detected CPU build type: $CPU_BUILD_TYPE"
+note "Ladybird Git revision: $GIT_HASH"
+note "Packaging timestamp: $BUILD_TIMESTAMP"
+note "Output AppImage: $OUTNAME"
 
 note "Cleaning old AppDir"
 rm -rf "$WORK"
