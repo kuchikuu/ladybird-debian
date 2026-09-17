@@ -196,6 +196,7 @@ It prints a ready-to-paste Markdown table row, for example:
 | Date | Distribution | Computer model | Kernel | Desktop | Session | GPU | Result |
 |---|---|---|---|---|---|---|---|
 | YYYY-MM-DD | Distribution | Computer model | Kernel version | Desktop | x11/wayland | GPU | ✅ |
+| 2026-09-17 | Artix Linux | LENOVO 232526S | 7.2.2-artix1-1.1 | XFCE | tty | VGA compatible controller: Intel Corporation Ivy Bridge mobile GT2 [HD Graphics 4000] (rev 09) | ✅ |
 | 2026-09-17 | Debian GNU/Linux 13 (trixie) | LENOVO 82EY | 6.12.107+deb13-amd64 | XFCE | x11 | VGA compatible controller: NVIDIA Corporation TU117M [GeForce GTX 1650 Ti Mobile] (rev a1) | ✅ |
 | 2026-09-17 | Pop!_OS 22.04 LTS | Acer Nitro AN515-57 | 7.1.1-76070101-generic | KDE | x11 | VGA compatible controller: Intel Corporation TigerLake-H GT1 [UHD Graphics] (rev 01) | ✅ |
 
