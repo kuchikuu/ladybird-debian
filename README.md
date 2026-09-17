@@ -182,19 +182,82 @@ If the AppImage works on your system, feel free to open an issue or contact me w
 Run this one-liner after confirming that Ladybird starts and renders pages correctly:
 
 ```bash
-. /etc/os-release 2>/dev/null; GPU="$(command -v lspci >/dev/null 2>&1 && lspci 2>/dev/null | grep -Ei 'VGA|3D|Display' | head -n1 | sed -E 's/^[^ ]+ //' | sed 's/|/\//g' || printf unknown)"; printf '| %s | %s | %s | %s | %s | %s | ✅ |\n' "$(date '+%Y-%m-%d')" "${PRETTY_NAME:-unknown}" "$(uname -r)" "${XDG_CURRENT_DESKTOP:-unknown}" "${XDG_SESSION_TYPE:-unknown}" "${GPU:-unknown}"
+. /etc/os-release 2>/dev/null; MODEL="$(printf '%s %s' "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)" "$(cat /sys/class/dmi/id/product_name 2>/dev/null)" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/|/\//g')"; GPU="$(command -v lspci >/dev/null 2>&1 && lspci 2>/dev/null | grep -Ei 'VGA|3D|Display' | head -n1 | sed -E 's/^[^ ]+ //' | sed 's/|/\//g' || printf unknown)"; printf '| %s | %s | %s | %s | %s | %s | %s | ✅ |\n' "$(date '+%Y-%m-%d')" "${PRETTY_NAME:-unknown}" "${MODEL:-unknown}" "$(uname -r)" "${XDG_CURRENT_DESKTOP:-unknown}" "${XDG_SESSION_TYPE:-unknown}" "${GPU:-unknown}"
 ```
 
 It prints a ready-to-paste Markdown table row, for example:
 
 ```text
-| 2026-09-15 | Debian GNU/Linux 13 (trixie) | 6.12.107+deb13-amd64 | XFCE | x11 | Intel Corporation ... | ✅ |
+| 2026-09-17 | Debian GNU/Linux ... | LENOVO 82EY | 6.12... | XFCE | x11 | VGA compatible controller: NVIDIA ...| ✅ |
 ```
 
 ### Confirmed AppImage compatibility
 
-| Date | Distribution | Kernel | Desktop | Session | GPU | Result |
-|---|---|---|---|---|---|---|
-| YYYY-MM-DD | Distribution | Kernel version | Desktop | x11/wayland | GPU | ✅ |
-| 2026-09-15 | Debian GNU/Linux 13 (trixie) | 6.12.107+deb13-amd64 | XFCE | x11 | VGA compatible controller: NVIDIA Corporation TU117M [GeForce GTX 1650 Ti Mobile] (rev a1) | ✅ |
-| 2026-09-15 | Pop!_OS 22.04 LTS | 7.1.1-76070101-generic | KDE | x11 | VGA compatible controller: Intel Corporation TigerLake-H GT1 [UHD Graphics] (rev 01) | ✅ |
+| Date | Distribution | Computer model | Kernel | Desktop | Session | GPU | Result |
+|---|---|---|---|---|---|---|---|
+| YYYY-MM-DD | Distribution | Computer model | Kernel version | Desktop | x11/wayland | GPU | ✅ |
+| 2026-09-17 | Debian GNU/Linux 13 (trixie) | LENOVO 82EY | 6.12.107+deb13-amd64 | XFCE | x11 | VGA compatible controller: NVIDIA Corporation TU117M [GeForce GTX 1650 Ti Mobile] (rev a1) | ✅ |
+| 2026-09-17 | Pop!_OS 22.04 LTS | Acer Nitro AN515-57 | 7.1.1-76070101-generic | KDE | x11 | VGA compatible controller: Intel Corporation TigerLake-H GT1 [UHD Graphics] (rev 01) | ✅ |
+
+## HTTPS / CA certificate troubleshooting
+
+If the AppImage starts normally but websites do not load, check the terminal output. If you see an error similar to:
+
+```text
+Request::handle_complete_state: Unable to map error (77): "Problem with the SSL CA cert (path? access rights?)"
+```
+
+Ladybird may be unable to access your distribution's system CA certificate bundle from inside its sandbox.
+
+Try launching the AppImage with an explicit CA bundle path.
+
+### Debian / Ubuntu / Linux Mint / Pop!_OS
+
+```bash
+./Ladybird-*.AppImage --certificate /etc/ssl/certs/ca-certificates.crt
+```
+
+### Arch Linux / Artix / Manjaro
+
+```bash
+./Ladybird-*.AppImage --certificate /etc/ca-certificates/extracted/tls-ca-bundle.pem
+```
+
+### Fedora / RHEL / Rocky Linux / AlmaLinux
+
+```bash
+./Ladybird-*.AppImage --certificate /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+```
+
+### openSUSE / SUSE Linux Enterprise
+
+```bash
+./Ladybird-*.AppImage --certificate /var/lib/ca-certificates/ca-bundle.pem
+```
+
+On some SUSE systems the same bundle is also exposed as `/etc/ssl/ca-bundle.pem`.
+
+### Alpine Linux
+
+```bash
+./Ladybird-*.AppImage --certificate /etc/ssl/certs/ca-certificates.crt
+```
+
+If none of these paths exist on your system, you can check common CA bundle locations with:
+
+```bash
+for f in \
+    /etc/ssl/certs/ca-certificates.crt \
+    /etc/ca-certificates/extracted/tls-ca-bundle.pem \
+    /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
+    /var/lib/ca-certificates/ca-bundle.pem \
+    /etc/ssl/ca-bundle.pem \
+    /etc/ssl/cert.pem
+do
+    [ -r "$f" ] && printf '%s -> %s\n' "$f" "$(readlink -f "$f")"
+done
+```
+
+Then pass the resolved path to Ladybird with `--certificate`.
+
+This is a workaround for CA bundle paths that Ladybird's current Linux sandbox may not be able to access automatically; it does not disable the sandbox.
