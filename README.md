@@ -120,7 +120,7 @@ The script will automatically use the local Rust installation whenever `LOCAL_RU
 Leave `LOCAL_RUST=false` to use your regular Rust environment instead.
 
 
-## Experimental AppImage
+# Experimental AppImage
 
 The repository also contains a script for creating a Ladybird AppImage from an existing local build.
 
@@ -175,7 +175,7 @@ The AppImage is still experimental. It has not been tested on every Linux distri
 
 A prebuilt example AppImage is available from the repository's [Releases](../../releases) page.
 
-### AppImage compatibility testing
+## AppImage compatibility testing
 
 If the AppImage works on your system, feel free to open an issue or contact me with the generated compatibility row below. I would like to keep a simple list of systems on which the AppImage has been confirmed to work.
 
@@ -191,7 +191,7 @@ It prints a ready-to-paste Markdown table row, for example:
 | 2026-09-17 | Debian GNU/Linux ... | LENOVO 82EY | 6.12... | XFCE | x11 | VGA compatible controller: NVIDIA ...| ✅ |
 ```
 
-### Confirmed AppImage compatibility
+## Confirmed AppImage compatibility
 
 | Date | Distribution | Computer model | Kernel | Desktop | Session | GPU | Result |
 |---|---|---|---|---|---|---|---|
@@ -264,7 +264,7 @@ Then pass the resolved path to Ladybird with `--certificate`.
 This is a workaround for CA bundle paths that Ladybird's current Linux sandbox may not be able to access automatically; it does not disable the sandbox.
 
 
-## What the AppImage packaging script does
+# What the AppImage packaging script does
 
 > This describes the current third-party AppImage packaging process used by this repository. It is not an official Ladybird release process. The script packages an already-built Ladybird tree; it does not compile Ladybird itself.
 
@@ -323,7 +323,7 @@ The steps are performed roughly in this order:
 The packaging script can make an existing build self-contained, but it cannot make CPU-specific machine code portable after the fact. For an AppImage intended for distribution, Ladybird should be compiled beforehand with the repository's portable build option (`-march=x86-64 -mtune=generic`) rather than `-march=native`.
 
 
-## Problems encountered while making the AppImage portable
+# Problems encountered while making the AppImage portable
 
 This is a short record of the main problems encountered while turning a local Ladybird build into an AppImage that could run on other Linux systems, and how each one was handled.
 
