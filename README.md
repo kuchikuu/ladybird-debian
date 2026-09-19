@@ -262,3 +262,62 @@ done
 Then pass the resolved path to Ladybird with `--certificate`.
 
 This is a workaround for CA bundle paths that Ladybird's current Linux sandbox may not be able to access automatically; it does not disable the sandbox.
+
+
+## What the AppImage packaging script does
+
+> This describes the current third-party AppImage packaging process used by this repository. It is not an official Ladybird release process. The script packages an already-built Ladybird tree; it does not compile Ladybird itself.
+
+The steps are performed roughly in this order:
+
+- **Detect the build type and generate an informative filename** — The script inspects `Build/release/compile_commands.json` to identify the build as `native`, `generic`, or `unknown`, reads the current architecture, records the packaging timestamp, and reads the first eight characters of the Ladybird Git commit. This makes the resulting filename identify what was packaged, for example `Ladybird-x86_64-generic-20260915-2321-154e8d68.AppImage`. The CPU type is informational only: the packaging script does not change compiler flags or rebuild Ladybird.
+
+- **Check the packaging tools** — Before doing any work, the script verifies that tools such as `curl`, `patchelf`, `readelf`, `ldd`, `file`, `python3`, `xvfb-run`, and `dbus-launch` are available. Packaging depends on these tools for dependency discovery, ELF inspection and modification, testing, and AppImage creation, so failing early gives a useful error instead of producing a partially broken package.
+
+- **Validate the existing Ladybird build** — The script checks that the Ladybird executable, helper processes, Ladybird libraries, Lagom resources, vcpkg libraries, Qt plugins, the desktop file, the application icon, and the matching `cranelift-compiler` are present. The AppImage must contain a coherent set of files from the same build rather than silently packaging an incomplete build tree.
+
+- **Create a clean AppDir** — The previous temporary `AppImageBuild` directory is removed and a fresh AppDir layout is created. Starting from a clean staging directory prevents files left over from an older package from leaking into the new AppImage.
+
+- **Copy Ladybird's own runtime files** — `Ladybird`, the matching `cranelift-compiler`, the helper executables, Ladybird/Lagom shared libraries, and Lagom resources are copied from `Build/release` into the AppDir. `cmake --install` is intentionally not used because a partial Ladybird build can contain install rules for configured targets that were never built even though the browser itself is usable.
+
+- **Copy Qt plugins explicitly** — The Qt plugin tree from the vcpkg installation is copied into the AppDir and a local `qt.conf` points Qt at it. Many Qt plugins are loaded dynamically with `dlopen()`, so they cannot all be discovered by simply running `ldd` on the Ladybird executable.
+
+- **Prepare desktop metadata and the icon** — The Ladybird `.desktop` file and icon are copied into the temporary packaging tree, and the desktop icon name is normalized. Working on copies avoids modifying files in the Ladybird source checkout while still giving the final AppImage correct desktop metadata.
+
+- **Download and configure `quick-sharun`** — The script downloads `quick-sharun`, sets the AppDir, output path, output filename, main executable, desktop file, and icon, and enables the AnyLinux library mode. `quick-sharun` performs most of the dependency collection and creates the sharun-based runtime environment used inside the AppImage.
+
+- **Optionally keep or strip symbols** — Symbols are kept by default, while `STRIP=1` can be used to request a smaller package. Keeping symbols is useful while the package is experimental because crashes remain easier to investigate.
+
+- **Collect runtime dependencies** — Ladybird, Cranelift, all executable helper processes, Ladybird shared libraries, Qt plugins, and dynamically loaded ANGLE libraries are passed to `quick-sharun`. The vcpkg library directory is temporarily added to `LD_LIBRARY_PATH` so dependency discovery can find the libraries used by the local Ladybird build.
+
+- **Route helper processes through sharun** — Ladybird launches processes such as `RequestServer`, `WebContent`, `WebWorker`, `Compositor`, `WasmCompiler`, and `ImageDecoder` through `libexec`. After deployment, the script replaces those raw helper executables with symlinks to the corresponding sharun entrypoints. Without this step, helpers can bypass the packaged runtime environment and retain loader paths from the build machine.
+
+- **Expose the matching Cranelift compiler through the packaged runtime** — The script verifies that `cranelift-compiler` survived dependency deployment and creates the expected `libexec/cranelift-compiler` link. Ladybird's WebAssembly JIT expects a compatible external Cranelift compiler, so the AppImage must ship the one matching the Ladybird build.
+
+- **Relocate copied vcpkg libraries** — If `quick-sharun` reproduces the build machine's absolute vcpkg directory structure inside the AppDir, the script moves that payload into `lib/vendor` and updates `lib.path` to use the relative location. This removes a dependency on paths such as `/home/user/.../Build/release/vcpkg_installed/...`.
+
+- **Remove build-machine RPATH/RUNPATH entries** — Every ELF file in the AppDir is inspected and any runtime search path that points back into the local source tree, build directory, vcpkg tree, or a developer home directory is removed with `patchelf`. An AppImage should resolve its bundled libraries from its own runtime environment, not from directories that only exist on the computer that created it.
+
+- **Undo the fixed `/usr/share` remapping created by quick-sharun** — `quick-sharun` can replace hardcoded `/usr/share` references with a fixed-length path under `/tmp`. The script restores those occurrences to `/usr/share` and disables that specific `_tmp_share` mapping. This avoids a fixed temporary path that can collide between users and allows system data such as GPU/GLVND metadata to come from the machine actually running Ladybird.
+
+- **Remove build-host NVIDIA driver files** — NVIDIA implementation libraries and related driver metadata copied from the packaging machine are removed while generic loader libraries are left intact. GPU driver binaries are tightly coupled to the host driver/kernel setup and should come from the target system rather than being frozen into an AppImage built on another machine.
+
+- **Remove known dangling symlinks and normalize final icon metadata** — Known broken links are removed only when they are actually dangling, and the final desktop file is checked again for the expected icon name. This prevents harmless-looking packaging leftovers from turning into broken runtime paths or desktop integration.
+
+- **Provide a safe `XDG_RUNTIME_DIR` fallback** — A runtime hook verifies the existing `XDG_RUNTIME_DIR`; if it is missing or unsuitable, it creates a private per-user directory under `/tmp`. Qt, IPC, and other desktop components expect a writable runtime directory with appropriate ownership and permissions, including when the AppImage is launched from unusual sessions or test users.
+
+- **Provide the system D-Bus address explicitly** — The runtime hook supplies `unix:path=/run/dbus/system_bus_socket` when no system bus address is already set. A vcpkg-built D-Bus library can otherwise carry assumptions from the build environment that are not valid on another distribution.
+
+- **Add the `time()` compatibility shim** — The script builds a tiny preload library that implements `time()` through `clock_gettime(CLOCK_REALTIME)` and injects it with `LD_PRELOAD`. In the sharun environment, glibc can otherwise issue the legacy `time` syscall directly, which is rejected by Ladybird's sandbox policy for processes such as `Compositor` and `WasmCompiler`.
+
+- **Set the packaged Cranelift path at runtime** — Another runtime hook sets `LADYBIRD_CRANELIFT_COMPILER` to the compiler bundled inside the AppImage unless the user has already provided a value. This prevents Ladybird from accidentally looking for a compiler at a path from the original build environment.
+
+- **Validate the finished AppDir before packing** — The script checks all helper symlinks, verifies the Cranelift links, scans all ELF files again for forbidden local RPATH/RUNPATH entries, confirms that the old absolute vcpkg tree is gone, and checks `lib.path` for build-machine paths. These checks deliberately stop packaging if the staged runtime still contains a known non-portable loader configuration.
+
+- **Create the AppImage** — Once the staged AppDir passes validation, `quick-sharun --make-appimage` produces the final `.AppImage` in `dist/`. Existing AppImages in `dist/` are not deleted, which makes it possible to keep older builds as self-contained snapshots for regression testing.
+
+- **Optionally run a smoke test** — With `SMOKE_TEST=1`, the resulting AppImage is launched for 12 seconds under Xvfb with CPU painting enabled. A timeout is treated as success because it means the browser stayed alive for the whole test window; an early non-zero exit is treated as a packaging failure. This catches obvious startup problems before the AppImage is distributed.
+
+### Important limitation
+
+The packaging script can make an existing build self-contained, but it cannot make CPU-specific machine code portable after the fact. For an AppImage intended for distribution, Ladybird should be compiled beforehand with the repository's portable build option (`-march=x86-64 -mtune=generic`) rather than `-march=native`.
