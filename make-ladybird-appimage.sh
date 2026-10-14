@@ -180,7 +180,7 @@ LD_LIBRARY_PATH="$APPDIR/lib:$BUILD/lib:$VCPKG_LIB${LD_LIBRARY_PATH:+:$LD_LIBRAR
 # entrypoints through sharun. Ladybird launches helpers from libexec/<name>, so
 # leaving the original ELF there bypasses sharun and keeps build-machine paths.
 note "Routing libexec helpers through sharun"
-helpers=(RequestServer WebContent WebWorker Compositor WasmCompiler ImageDecoder)
+helpers=(RequestServer WebContent WebWorker Compositor WasmCompiler ImageDecoder MediaServer)
 for name in "${helpers[@]}"; do
     if [[ -e "$APPDIR/bin/$name" || -L "$APPDIR/bin/$name" ]]; then
         rm -f "$APPDIR/libexec/$name"
